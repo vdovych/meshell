@@ -1,73 +1,18 @@
-#include <iostream>
-#include <unistd.h>
-#include <cstring>
-#include <vector>
-#include <wait.h>
-#include <dirent.h>
-#include <sys/stat.h>
-#include <libgen.h>
-#include <map>
-#include <fnmatch.h>
-
+#include "meshell.h"
 #define BUFFERSIZE 4096
 
 
 using namespace std;
 
+
 char curpath[BUFFERSIZE];
-void margs(const vector<string>& args){
-    if(args[1]=="-h"||args[1]=="--help"){
-        cout<<"HEEEELP!!!!"<<endl;
-        return;
-    }
-    for(auto& e:args){
-        cout<<e<<endl;
-    }
-}
-
-void mcd(const vector<string>& args){
-    if(args[1]=="-h"||args[1]=="--help"){
-        cout<<"HEEEELP!!!!"<<endl;
-        return;
-    }
-    char*tmp=realpath(args[1].c_str(),NULL);
-    if(tmp!=NULL)
-        chdir(tmp);
-    else
-        errno=2;
-}
-void merrno(const vector<string>& args){
-    if(args[1]=="-h"||args[1]=="--help"){
-        cout<<"HEEEELP!!!!"<<endl;
-        return;
-    }
-    cout<<errno;
-}
-void mpwd(const vector<string>& args){
-    if(args[1]=="-h"||args[1]=="--help"){
-        cout<<"HEEEELP!!!!"<<endl;
-        return;
-    }
-    cout<<curpath<<endl;
-
-}
-void mexit(const vector<string>& args){
-    if(args[1]=="-h"||args[1]=="--help"){
-        cout<<"HEEEELP!!!!"<<endl;
-        return;
-    }
-    exit(atoi(args[1].c_str()));
-}
-
-typedef void (*builtin)(const vector<string>&);
-const map<string,builtin> builtins={{"mcd",mcd},{"merrno",merrno},{"mpwd",mpwd},{"mexit",mexit},{"margs",margs}};
-
+const map<string,builtin> builtins={{"mcd",mcd},{"merrno",merrno},{"mpwd",mpwd},{"mexit",mexit},{"margs",margs},{".",mdot}};
 
 class Command{
     vector<string> args;
     void forkexec() {
         const char* command = args[0].c_str();
-        char* argv[BUFFERSIZE];
+        char* argv[BUFFERSIZE]={0};
         for (int i = 0; i < args.size(); ++i) {
             argv[i]=new char[BUFFERSIZE];
             strcpy(argv[i],args[i].c_str());
@@ -100,7 +45,11 @@ public:
         bool replace = true;
         bool escape  = false;
         for(auto ch:raw_command) {
-            if (escape){
+            if(ch=='#'&&!onelapka&&!twolapka){
+                if(!curr_comm.empty())
+                    args.push_back(curr_comm);
+                break;
+            }else if (escape){
                 curr_comm+=ch;
                 escape=false;
             } else if (ch == '\'') {
@@ -183,6 +132,68 @@ public:
     }
 };
 
+void margs(const vector<string>& args){
+    if(args[1]=="-h"||args[1]=="--help"){
+        cout<<"HEEEELP!!!!"<<endl;
+        return;
+    }
+    for(auto& e:args){
+        cout<<e<<endl;
+    }
+}
+void mdot(const vector<string>& args){
+    if(args[1]=="-h"||args[1]=="--help"){
+        cout<<"HEEEELP!!!!"<<endl;
+        return;
+    }
+    Command* command;
+    char in[BUFFERSIZE];
+    FILE* inp = fopen(args[1].c_str(),"r");
+    while (true){
+        if(fgets(in, BUFFERSIZE, inp)== nullptr){
+            break;
+        }
+        command = new Command(in);
+        command->exec();
+    }
+
+}
+void mcd(const vector<string>& args){
+    if(args[1]=="-h"||args[1]=="--help"){
+        cout<<"HEEEELP!!!!"<<endl;
+        return;
+    }
+    char*tmp=realpath(args[1].c_str(),NULL);
+    if(tmp!=NULL)
+        chdir(tmp);
+    else
+        errno=2;
+}
+void merrno(const vector<string>& args){
+    if(args[1]=="-h"||args[1]=="--help"){
+        cout<<"HEEEELP!!!!"<<endl;
+        return;
+    }
+    cout<<errno;
+}
+void mpwd(const vector<string>& args){
+    if(args[1]=="-h"||args[1]=="--help"){
+        cout<<"HEEEELP!!!!"<<endl;
+        return;
+    }
+    cout<<curpath<<endl;
+
+}
+void mexit(const vector<string>& args){
+    if(args[1]=="-h"||args[1]=="--help"){
+        cout<<"HEEEELP!!!!"<<endl;
+        return;
+    }
+    exit(atoi(args[1].c_str()));
+}
+
+
+
 int Init(){
     char path[BUFFERSIZE];
     getcwd(path,BUFFERSIZE);
@@ -197,12 +208,22 @@ int main(int argc, char** argv){
 
     Command* command;
     char in[BUFFERSIZE];
-
-    while (true) {
-        getcwd(curpath,BUFFERSIZE);
-        cout << curpath << " $ ";
-        fgets(in,BUFFERSIZE,stdin);
-        command=new Command(in);
-        command->exec();
+    if(argc==1) {
+        while (true) {
+            getcwd(curpath, BUFFERSIZE);
+            cout << curpath << " $ ";
+            fgets(in, BUFFERSIZE, stdin);
+            command = new Command(in);
+            command->exec();
+        }
+    } else{
+        FILE* inp = fopen(argv[1],"r");
+        while (true){
+            if(fgets(in, BUFFERSIZE, inp)== nullptr){
+                break;
+            }
+            command = new Command(in);
+            command->exec();
+        }
     }
 }
