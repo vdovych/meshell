@@ -15,14 +15,22 @@
 #include <libgen.h>
 #include <map>
 #include <fnmatch.h>
-
+using namespace std;
 typedef void (*builtin)(const std::vector<std::string>&);
-void margs(const std::vector<std::string>& args);
+void mexport(const vector<string>& args);
+void mecho(const std::vector<std::string>& args);
 void mdot(const std::vector<std::string>& args);
 void mcd(const std::vector<std::string>& args);
 void mpwd(const std::vector<std::string>& args);
 void mexit(const std::vector<std::string>& args);
 void merrno(const std::vector<std::string>& args);
+class Command{
+    vector<string> args;
+    void forkexec();
+public:
+    Command(string raw_command);
+    void exec();
+};
 int Init();
 
 #endif //MESHELL_MESHELL_H
