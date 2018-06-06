@@ -227,7 +227,8 @@ void mexit(const vector<string>& args){
         }
         exit(atoi(args[1].c_str()));
         return;
-    }
+    } else if(args.size()==1)
+        exit(0);
     errno=1;
     cerr<<"Bad arguments"<<endl;
 }
@@ -252,16 +253,19 @@ int main(int argc, char** argv){
         return -1;
 
     Command* command;
-    char in[BUFFERSIZE];
+    string in;
     if(argc==1) {
         while (true) {
             getcwd(curpath, BUFFERSIZE);
-            cout << curpath << " $ ";
-            fgets(in, BUFFERSIZE, stdin);
-            command = new Command(in);
-            command->exec();
+            in=readline(((string)curpath+" $ ").c_str());
+            if(in.size()>0) {
+                add_history(in.c_str());
+                command = new Command(in);
+                command->exec();
+            }
         }
     } else{
+        char in[BUFFERSIZE];
         FILE* inp = fopen(argv[1],"r");
         while (true){
             if(fgets(in, BUFFERSIZE, inp)== nullptr){

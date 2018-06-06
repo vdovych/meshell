@@ -15,6 +15,9 @@
 #include <libgen.h>
 #include <map>
 #include <fnmatch.h>
+
+#include <readline/readline.h>
+#include <readline/history.h>
 using namespace std;
 typedef void (*builtin)(const std::vector<std::string>&);
 void mexport(const vector<string>& args);
