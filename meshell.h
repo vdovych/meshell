@@ -18,22 +18,36 @@
 
 #include <readline/readline.h>
 #include <readline/history.h>
+
 using namespace std;
-typedef void (*builtin)(const std::vector<std::string>&);
-void mexport(const vector<string>& args);
-void mecho(const std::vector<std::string>& args);
-void mdot(const std::vector<std::string>& args);
-void mcd(const std::vector<std::string>& args);
-void mpwd(const std::vector<std::string>& args);
-void mexit(const std::vector<std::string>& args);
-void merrno(const std::vector<std::string>& args);
-class Command{
+
+typedef void (*builtin)(const std::vector<std::string> &);
+
+void mexport(const vector<string> &args);
+void mecho(const std::vector<std::string> &args);
+void mdot(const std::vector<std::string> &args);
+void mcd(const std::vector<std::string> &args);
+void mpwd(const std::vector<std::string> &args);
+void mexit(const std::vector<std::string> &args);
+void merrno(const std::vector<std::string> &args);
+
+class Command {
     vector<string> args;
+    string cin_ch;
+    string cout_ch;
+    string cerr_ch;
+    int cin_fd=-1,cout_fd=-1,cerr_fd=-1;
+    bool background= false;
+    void parse_redirection();
     void forkexec();
+
 public:
     Command(string raw_command);
+    Command(vector<string>,int cin_fd,int cout_fd,int cerr_fd, bool background);
+
     void exec();
 };
+
 int Init();
 
 #endif //MESHELL_MESHELL_H

@@ -6,6 +6,7 @@ include_directories(/usr/include/readline)
 
 
 
-add_executable(meshell meshell.cpp meshell.h)
+add_executable(myshell meshell.cpp meshell.h)
 
-target_link_libraries(meshell readline)
+target_link_libraries(myshell readline)
+add_executable(myls myls.cpp myls.h)
