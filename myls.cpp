@@ -2,7 +2,6 @@
 // Created by stanislav on 07.06.18.
 //
 
-#include <algorithm>
 #include "myls.h"
 
 
@@ -53,7 +52,10 @@ vector<string> get_filenames(vector<string>& dirs, bool recursive){
 }
 details get_details(string file){
     struct stat buff;
-    stat(file.c_str(), &buff);
+    if (stat(file.c_str(), &buff) < 0) {
+        perror(basename(file.c_str()));
+        return details();
+    }
     details dets;
     dets.name=basename(file.c_str());
     dets.size=buff.st_size;

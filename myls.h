@@ -12,5 +12,7 @@
 #include <cstring>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <algorithm>
+
 
 #endif //MESHELL_MYLS_H

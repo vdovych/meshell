@@ -45,6 +45,7 @@ public:
     Command(string raw_command);
     Command(vector<string>,int cin_fd,int cout_fd,int cerr_fd, bool background);
 
+    void set_out(int i);
     void exec();
 };
 

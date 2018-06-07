@@ -2,7 +2,6 @@
 #include "meshell.h"
 #define BUFFERSIZE 4096
 
-//TODO: work with errors
 using namespace std;
 
 
@@ -13,8 +12,31 @@ const map<string,builtin> builtins={{"mcd",mcd},{"merrno",merrno},{"mpwd",mpwd},
                                     {"mecho",mecho},{".",mdot},{"mexport",mexport}};
 
 
+void assign_comm(string &args) {
+    string var = args.substr(0, args.find_first_of('='));
+    string raw_comm = args.substr(args.find_first_of('=') + 1, args.size());
+    Command comm(raw_comm);
+    int pip[2];
+    if (pipe(pip) < 0) {
+        perror("pipe");
+        return;
+    }
+    comm.set_out(pip[1]);
+    comm.exec();
+    if (close(pip[1]) < 0)
+        perror("close");
+    char res[BUFFERSIZE];
+    if (read(pip[0], res, BUFFERSIZE) < 0) {
+        perror("read");
+    }
+    setenv(var.c_str(), res, 1);
+    if (close(pip[0]) < 0)
+        perror("close");
+}
 
-
+void Command::set_out(int i) {
+    cout_fd = i;
+}
 void Command::forkexec() {
     const char* command = args[0].c_str();
     char* argv[BUFFERSIZE]={0};
@@ -34,6 +56,7 @@ void Command::forkexec() {
         int status;
         if(!background)
             waitpid(pid, &status, 0);
+
     }
     else
     {
@@ -45,7 +68,8 @@ void Command::forkexec() {
         if(!cin_ch.empty()||cin_fd!=-1){
             close(STDIN_FILENO);
             if(!cin_ch.empty())
-                cin_fd = open(cin_ch.c_str(),O_RDONLY);
+                if ((cin_fd = open(cin_ch.c_str(), O_RDONLY)) < 0)
+                    perror(cin_ch.c_str());
             dup2(cin_fd,STDIN_FILENO);
         }
         if(!cout_ch.empty()||cout_fd!=-1){
@@ -53,9 +77,10 @@ void Command::forkexec() {
             if(!cout_ch.empty())
                 if(cout_ch=="&2")
                     cout_fd = STDERR_FILENO;
-                else
-                    cout_fd = open(cout_ch.c_str(),O_CREAT|O_WRONLY|O_TRUNC,S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP |
-                                                                        S_IROTH | S_IWOTH);
+                else if ((cout_fd = open(cout_ch.c_str(), O_CREAT | O_WRONLY | O_TRUNC,
+                                         S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP |
+                                         S_IROTH | S_IWOTH)) < 0)
+                    perror(cout_ch.c_str());
             dup2(cout_fd,STDOUT_FILENO);
         }
         if(!cerr_ch.empty()||cerr_fd!=-1){
@@ -63,9 +88,10 @@ void Command::forkexec() {
             if(!cerr_ch.empty())
                 if(cerr_ch=="&1")
                     cerr_fd = STDOUT_FILENO;
-                else
-                    cerr_fd = open(cout_ch.c_str(),O_CREAT|O_WRONLY|O_TRUNC,S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP |
-                                                                    S_IROTH | S_IWOTH);
+                else if ((cerr_fd = open(cout_ch.c_str(), O_CREAT | O_WRONLY | O_TRUNC,
+                                         S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP |
+                                         S_IROTH | S_IWOTH)) < 0)
+                    perror(cerr_ch.c_str());
             dup2(cerr_fd,STDERR_FILENO);
         }
 
@@ -85,6 +111,7 @@ Command::Command(string raw_command) {
     bool out_to = false;
     bool err_to = false;
     bool in_from = false;
+    bool apostrof = false;
     for(auto ch:raw_command) {
         if(ch=='#'&&!onelapka&&!twolapka){
             if(!curr_comm.empty())
@@ -103,6 +130,8 @@ Command::Command(string raw_command) {
             replace = false;
         } else if (ch == '\"'&&!onelapka) {
             twolapka = !twolapka;
+        } else if (ch == '`') {
+            apostrof = !apostrof;
         } else if (ch == '\\') {
             escape = true;
         } else if (ch == '-'){
@@ -111,21 +140,21 @@ Command::Command(string raw_command) {
 
 
         } else if (isspace(ch)){
-            if(onelapka||twolapka){
+            if (onelapka || twolapka || apostrof) {
                 curr_comm+=ch;
             }else{
 
 
-                if(replace&&!args.empty()){
-                    if(curr_comm[0]=='$'){
-                        char* var=getenv(curr_comm.c_str()+1);
-                        if(var!=NULL){
+                if(replace && !args.empty()){
+                    if(curr_comm[0] == '$'){
+                        char* var=getenv(curr_comm.c_str() + 1);
+                        if(var != NULL){
                             curr_comm=var;
                         }
                     }
-                    if(curr_comm=="2>&1"){
+                    if(curr_comm == "2>&1"){
                         cerr_ch="&1";
-                    } else if(curr_comm==">&2"){
+                    } else if(curr_comm == ">&2"){
                         cout_ch="&2";
                     }else if(curr_comm==">"){
                         out_to= true;
@@ -147,6 +176,8 @@ Command::Command(string raw_command) {
                         realpath(curr_comm.c_str(), path);
                         dirent **files;
                         int k = scandir(dirname(dir), &files, 0, alphasort);
+                        if (k < 0)
+                            perror("scandir");
                         for (int i = 0; i < k; i++) {
                             if (strcmp(files[i]->d_name, ".") != 0 && strcmp(files[i]->d_name, "..") != 0) {
                                 if (!fnmatch(basename(path), files[i]->d_name, 0)) {
@@ -169,8 +200,11 @@ Command::Command(string raw_command) {
                     }
 
 
-                }else if(args.empty()&&assign){
-                    putenv(strdup(curr_comm.c_str()));
+                }else if(args.empty() && assign){
+                    if (curr_comm.find_first_of('`') > 0) {
+                        assign_comm(curr_comm);
+                    } else
+                        putenv(strdup(curr_comm.c_str()));
                 } else {
                     if(!curr_comm.empty())
                         args.push_back(curr_comm);
@@ -227,22 +261,31 @@ void Command::exec() {
                 args_curr.push_back(args[i]);
             }
             if(prev == nullptr){
-                pipe(pip);
+
+                if (pipe(pip) < 0)
+                    perror("pipe");
                 curr=new Command(args_curr,-1,pip[1],-1,true);
                 curr->exec();
             }else {
                 if(conv_next){
                     int p=pip[0];
-                    pipe(pip);
+
+                    if (pipe(pip) < 0)
+                        perror("pipe");
                     curr=new Command(args_curr,p,pip[1],-1, true);
                     curr->exec();
                 } else{
                     if(!cout_ch.empty())
-                        cout_fd = open(cout_ch.c_str(),O_CREAT|O_WRONLY|O_TRUNC,S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP |
-                                                                                S_IROTH | S_IWOTH);
+                        if ((cout_fd = open(cout_ch.c_str(), O_CREAT | O_WRONLY | O_TRUNC,
+                                            S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP |
+                                            S_IROTH | S_IWOTH)) < 0) {
+                            perror(cout_ch.c_str());
+                        }
                     if(!cerr_ch.empty())
-                        cerr_fd = open(cout_ch.c_str(),O_CREAT|O_WRONLY|O_TRUNC,S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP |
-                                                                                S_IROTH | S_IWOTH);
+                        if ((cerr_fd = open(cout_ch.c_str(), O_CREAT | O_WRONLY | O_TRUNC,
+                                            S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP |
+                                            S_IROTH | S_IWOTH)) < 0)
+                            perror(cerr_ch.c_str());
                     curr=new Command(args_curr,pip[0],cout_fd,cerr_fd,background);
                     curr->exec();
                 }
@@ -253,7 +296,7 @@ void Command::exec() {
         bool b = true;
         for (auto &buil:builtins) {
             if (args[0] == buil.first) {
-                buil.second(args);//TODO:redirect
+                buil.second(args);
                 b = false;
                 break;
             }
@@ -287,6 +330,10 @@ void mexport(const vector<string>& args){
     }
 }
 void mecho(const vector<string>& args){
+    if (args.size() < 2) {
+        cerr << "No arguments" << endl;
+        return;
+    }
     if(args[1]=="-h"||args[1]=="--help"){
         cout<<"HEEEELP!!!!"<<endl;
         return;
@@ -337,15 +384,20 @@ void merrno(const vector<string>& args){
         cout<<"HEEEELP!!!!"<<endl;
         return;
     }
-    cout<<errno<<endl;
+    if (args.size() == 1)
+        cout << errno << endl;
+    else
+        cerr << "Bad args" << endl;
 }
 void mpwd(const vector<string>& args){
     if(args.size()==2&&(args[1]=="-h"||args[1]=="--help")){
         cout<<"HEEEELP!!!!"<<endl;
         return;
     }
-    cout<<curpath<<endl;
-
+    if (args.size() == 1)
+        cout << curpath << endl;
+    else
+        cerr << "Bad args" << endl;
 }
 void mexit(const vector<string>& args){
     if(args.size()==2) {
