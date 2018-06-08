@@ -3,16 +3,10 @@
 //
 
 #include "myls.h"
-
+#include "utility.h"
 
 #define BUFFSIZE 4096
-using namespace std;
-bool is_dir(string file) {
-    struct stat buff;
-    if (stat(file.c_str(), &buff) != 0)
-        return 0;
-    return S_ISDIR(buff.st_mode);
-}
+
 struct details{
     string name;
     int size;
@@ -53,11 +47,11 @@ vector<string> get_filenames(vector<string>& dirs, bool recursive){
 details get_details(string file){
     struct stat buff;
     if (stat(file.c_str(), &buff) < 0) {
-        perror(basename(file.c_str()));
+        perror(basename(strdup(file.c_str())));
         return details();
     }
     details dets;
-    dets.name=basename(file.c_str());
+    dets.name = basename(strdup(file.c_str()));
     dets.size=buff.st_size;
     dets.lastmod_t=buff.st_mtim;
     char buf[BUFFSIZE];

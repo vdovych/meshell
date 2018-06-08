@@ -232,67 +232,67 @@ Command::Command(vector<string> args,int cin_fd,int cout_fd,int cerr_fd, bool ba
 }
 
 void Command::exec() {
-    if(args.empty()){
+    if (args.empty()) {
         return;
     }
-    if(args.back()=="&"){
-        background= true;
+    if (args.back() == "&") {
+        background = true;
     }
-    bool conv =false;
-    for (auto& arg:args){
-        if(arg=="|"){
-            conv= true;
+    bool conv = false;
+    for (auto &arg:args) {
+        if (arg == "|") {
+            conv = true;
             break;
         }
     }
-    if(conv){
-        int i=0;
-        Command *prev= nullptr,*curr= nullptr;
+    if (conv) {
+        int i = 0;
+        Command *prev = nullptr, *curr = nullptr;
         int pip[2];
-        while(i<args.size()){
-            bool conv_next=false;
+        while (i < args.size()) {
+            bool conv_next = false;
             vector<string> args_curr;
-            for(;i<args.size();i++){
-                if(args[i]=="|"){
+            for (; i < args.size(); i++) {
+                if (args[i] == "|") {
                     i++;
-                    conv_next= true;
+                    conv_next = true;
                     break;
                 }
                 args_curr.push_back(args[i]);
             }
-            if(prev == nullptr){
+            if (prev == nullptr) {
 
                 if (pipe(pip) < 0)
                     perror("pipe");
-                curr=new Command(args_curr,-1,pip[1],-1,true);
+                curr = new Command(args_curr, -1, pip[1], -1, true);
                 curr->exec();
-            }else {
-                if(conv_next){
-                    int p=pip[0];
+            } else {
+                if (conv_next) {
+                    int p = pip[0];
 
                     if (pipe(pip) < 0)
                         perror("pipe");
-                    curr=new Command(args_curr,p,pip[1],-1, true);
+                    curr = new Command(args_curr, p, pip[1], -1, true);
                     curr->exec();
-                } else{
-                    if(!cout_ch.empty())
+                } else {
+                    if (!cout_ch.empty())
                         if ((cout_fd = open(cout_ch.c_str(), O_CREAT | O_WRONLY | O_TRUNC,
                                             S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP |
                                             S_IROTH | S_IWOTH)) < 0) {
                             perror(cout_ch.c_str());
                         }
-                    if(!cerr_ch.empty())
+                    if (!cerr_ch.empty())
                         if ((cerr_fd = open(cout_ch.c_str(), O_CREAT | O_WRONLY | O_TRUNC,
                                             S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP |
                                             S_IROTH | S_IWOTH)) < 0)
                             perror(cerr_ch.c_str());
-                    curr=new Command(args_curr,pip[0],cout_fd,cerr_fd,background);
+                    curr = new Command(args_curr, pip[0], cout_fd, cerr_fd, background);
                     curr->exec();
                 }
             }
-            prev=curr;
+            prev = curr;
         }
-    }else {
+    } else {
         bool b = true;
         for (auto &buil:builtins) {
             if (args[0] == buil.first) {

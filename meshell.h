@@ -38,7 +38,6 @@ class Command {
     string cerr_ch;
     int cin_fd=-1,cout_fd=-1,cerr_fd=-1;
     bool background= false;
-    void parse_redirection();
     void forkexec();
 
 public:
